@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from app.routers.routes import router
 from contextlib import asynccontextmanager
 
-from app.internal.database import CLIENT, CONFIG, DB_NAME, DB
+from app.internal.database import CLIENT, DB_NAME, DB
 
 
 @asynccontextmanager

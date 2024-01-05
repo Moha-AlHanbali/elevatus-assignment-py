@@ -17,7 +17,6 @@ setuptools = "^69.0.3"
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.4"
 httpx = "^0.26.0"
-pytest-mongodb = "^2.4.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.12.1"
