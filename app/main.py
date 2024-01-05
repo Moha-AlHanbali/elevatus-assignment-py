@@ -1,42 +1,35 @@
-'This module is the entry point to the assignment project'
+"This module is the entry point to the assignment project"
 
-from fastapi import FastAPI 
-from dotenv import dotenv_values
-from pymongo import MongoClient
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
+from fastapi import FastAPI
 from app.routers.routes import router
 from contextlib import asynccontextmanager
 
+from app.internal.database import CLIENT, CONFIG, DB_NAME, DB
 
-config = dotenv_values(".env")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
     # Connect to DB
-    app.mongodb_client = MongoClient(config["ATLAS_URI"], server_api=ServerApi('1'))
-    app.database = app.mongodb_client[config["DB_NAME"]]
+    app.mongodb_client = CLIENT
+    app.database = DB
 
     try:
-        app.mongodb_client.admin.command('ping')
-        print(f"Connected to staging DB ({config["DB_NAME"]}) successfully.")
+        CLIENT.admin.command("ping")
+        print(f"Connected to staging DB ({DB_NAME}) successfully.")
     except Exception as e:
         print(e)
 
     yield
 
     # Shutdown connection
-    app.mongodb_client.close()
-    print(f"Disconnected from staging DB ({config["DB_NAME"]}) successfully.")
+    CLIENT.close()
+    print(f"Disconnected from staging DB ({DB_NAME}) successfully.")
 
 
 app = FastAPI(
-    title = "Elevatus Technical Assignment",
-    description = "Technical Assignment by Elevatus for a Python Developer Role",
-    lifespan=lifespan
-              )
-
-
+    title="Elevatus Technical Assignment",
+    description="Technical Assignment by Elevatus for a Python Developer Role",
+    lifespan=lifespan,
+)
 
 app.include_router(router)
