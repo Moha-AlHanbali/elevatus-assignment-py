@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
 
-from app.internal.database import TEST_CLIENT, TEST_DB, TEST_DB_NAME
+from app.internal.database import TEST_CLIENT, TEST_DB, TEST_DB_NAME, PRODUCTION
 from app.routers.routes import router
+
 
 app = FastAPI()
 app.include_router(router)
@@ -14,17 +15,16 @@ candidate_test_id = {"value": ""}
 @pytest.fixture
 def test_app():
     with TestClient(app) as client:
+        if PRODUCTION.lower() != "false":
+            raise Exception("PLEASE DISABLE PRODUCTION ENVIRONMENT.")
         app.mongodb_client = TEST_CLIENT
         app.database = TEST_DB
 
         print(f"Connected to testing DB ({TEST_DB_NAME}) successfully.")
 
-        app.database.drop_collection("user")
-        app.database.drop_collection("candidate")
-
         TEST_USERS = TEST_DB["user"]
         TEST_CANDIDATES = TEST_DB["candidate"]
-        
+
         TEST_USERS.create_index([("email", 1)], unique=True)
         TEST_CANDIDATES.create_index([("email", 1)], unique=True)
         yield client
@@ -42,9 +42,9 @@ def test_create_user_unique_email(test_app):
     response = test_app.post(
         "/user",
         json={
-            "first_name": "John",
-            "last_name": "Doe",
-            "email": "john.doe@example.com",
+            "first_name": "application",
+            "last_name": "user",
+            "email": "useremail@example.com",
         },
     )
     assert response.status_code == 201
@@ -73,7 +73,7 @@ def test_create_candidate(test_app):
         json={
             "first_name": "John",
             "last_name": "Doe",
-            "email": "1john.doe@example.com",
+            "email": "john.doe@example.com",
             "career_level": "Senior",
             "job_major": "Computer Science",
             "years_of_experience": 3,
@@ -84,6 +84,7 @@ def test_create_candidate(test_app):
             "salary": 2500000.0,
             "gender": "Male"
         },
+        headers = {"Authorization-Email": "useremail@example.com"}
     )
     candidate_test_id["value"] = response.json()["_id"]
 
@@ -94,7 +95,10 @@ def test_create_candidate(test_app):
 
 def test_get_candidate(test_app):
     assert candidate_test_id["value"] is not None
-    response = test_app.get(f"/candidate/{candidate_test_id["value"]}")
+
+    response = test_app.get(f"/candidate/{candidate_test_id["value"]}",
+    headers = {"Authorization-Email": "useremail@example.com"}
+    )
     assert response.status_code == 200
     assert "first_name" in response.json()
     assert "last_name" in response.json()
@@ -117,6 +121,7 @@ def test_update_candidate(test_app):
             "salary": 600000,
             "gender": "Male"
         },
+        headers = {"Authorization-Email": "useremail@example.com"}
     )
     assert response.status_code == 200
     assert "first_name" in response.json()
@@ -127,7 +132,8 @@ def test_update_candidate(test_app):
     assert response.json()["email"] == "mark.doe@example.com"
 
 def test_delete_candidate(test_app):
-    response = test_app.delete(f"/candidate/{candidate_test_id["value"]}")
+    response = test_app.delete(f"/candidate/{candidate_test_id["value"]}", headers = {"Authorization-Email": "useremail@example.com"}
+)
     assert response.status_code == 204
 
 
@@ -150,6 +156,8 @@ def test_get_all_candidates(test_app):
             "salary": 100000.0,
             "gender": "Male",
         },
+        headers = {"Authorization-Email": "useremail@example.com"}
+
     )
     test_app.post(
         "/candidate",
@@ -167,25 +175,35 @@ def test_get_all_candidates(test_app):
             "salary": 80000.0,
             "gender": "Female",
         },
+        headers = {"Authorization-Email": "useremail@example.com"}
+
     )
 
     # Test global search with keywords
-    response = test_app.get("/all-candidates?keywords=John")
+    response = test_app.get("/all-candidates?keywords=John",
+    headers = {"Authorization-Email": "useremail@example.com"}
+    )
     assert response.status_code == 200
     assert response.json()[0]["first_name"] == "John"
 
     # Test regular filters
-    response = test_app.get("/all-candidates?career_level=Senior&city=NY")
+    response = test_app.get("/all-candidates?career_level=Senior&city=NY",
+    headers = {"Authorization-Email": "useremail@example.com"}
+    )
     assert response.status_code == 200
     assert response.json()[0]["first_name"] == "John"
 
     # Test global search with keywords and regular filters
-    response = test_app.get("/all-candidates?keywords=Doe&city=SF")
+    response = test_app.get("/all-candidates?keywords=Doe&city=SF",
+    headers = {"Authorization-Email": "useremail@example.com"}
+    )
     assert response.status_code == 200
     assert response.json()[0]["first_name"] == "Jane"
 
     # Test when no candidates match the criteria
-    response = test_app.get("/all-candidates?keywords=InvalidName")
+    response = test_app.get("/all-candidates?keywords=InvalidName",
+    headers = {"Authorization-Email": "useremail@example.com"}
+    )
     assert response.status_code == 200
     assert len(response.json()) == 0
 
@@ -238,5 +256,13 @@ def test_generate_report(test_app):
         == "attachment; filename=candidates_report.csv"
     )
 
-    expected_header = "_id,first_name,last_name,email,career_level,job_major,years_of_experience,degree_type,skills,nationality,city,salary,gender\n"
-    assert response.text.startswith(expected_header)
+    expected_headers = "_id,first_name,last_name,email,career_level,job_major,years_of_experience,degree_type,skills,nationality,city,salary,gender\n"
+    assert response.text.startswith(expected_headers)
+
+
+def test_cleanup(test_app):
+    app.database.drop_collection("user")
+    app.database.drop_collection("candidate")
+    test_app.close()
+    print(f"Disconnected to testing DB ({TEST_DB_NAME}) successfully.")
+

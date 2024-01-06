@@ -1,6 +1,7 @@
 "This module contains thr API routes"
 
 from typing import List
+from dotenv import dotenv_values
 from fastapi import (
     APIRouter,
     Body,
@@ -16,10 +17,27 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.internal.models import User, Candidate
 from pymongo.errors import DuplicateKeyError
 
-from app.internal.database import USERS, CANDIDATES
-
+from app.internal.database import USERS, CANDIDATES, TEST_USERS, TEST_CANDIDATES
 
 router = APIRouter()
+
+CONFIG = dotenv_values(".env")
+PRODUCTION = CONFIG["PRODUCTION"]
+
+def detect_user_context():
+    if PRODUCTION.lower == "true":
+        user_collection = USERS
+    else:
+        user_collection = TEST_USERS
+    return user_collection
+
+
+def detect_candidate_context():
+    if PRODUCTION.lower == "true":
+        candidate_collection = CANDIDATES
+    else:
+        candidate_collection = TEST_CANDIDATES
+    return candidate_collection
 
 
 @router.get(
@@ -37,7 +55,11 @@ def health_check():
 )
 def create_user(request: Request, user: User = Body(...)):
     try:
-        existing_emails = [entry["email"] for entry in USERS.find({}, {"email": 1})]
+        user_collection = detect_user_context()
+
+        existing_emails = [
+            entry["email"] for entry in user_collection.find({}, {"email": 1})
+        ]
         if user.email in existing_emails:
             return JSONResponse(
                 content={"detail": "Email must be unique"}, status_code=400
@@ -58,8 +80,8 @@ def create_user(request: Request, user: User = Body(...)):
         )
 
 
-def get_user_email(authorization: str = Header(...)):
-    return authorization
+def get_user_email(Authorization_Email: str = Header(...)):
+    return Authorization_Email
 
 
 @router.post(
@@ -68,22 +90,28 @@ def get_user_email(authorization: str = Header(...)):
     status_code=status.HTTP_201_CREATED,
     response_model=Candidate,
 )
-def create_candidate(candidate: Candidate, user_email: str = Depends(get_user_email)):
-    user = USERS.find_one({"email": user_email})
-    print(user_email)
+def create_candidate(
+    request: Request, candidate: Candidate, user_email: str = Depends(get_user_email)
+):
+    user_collection = detect_user_context()
+
+    user = user_collection.find_one({"email": user_email})
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
+        candidate_collection = detect_candidate_context()
         existing_emails = [
-            entry["email"] for entry in CANDIDATES.find({}, {"email": 1})
+            entry["email"] for entry in candidate_collection.find({}, {"email": 1})
         ]
         if candidate.email in existing_emails:
             raise DuplicateKeyError("Email must be unique")
 
         candidate_dict = jsonable_encoder(candidate)
-        new_candidate = CANDIDATES.insert_one(candidate_dict)
-        created_candidate = CANDIDATES.find_one({"_id": new_candidate.inserted_id})
+        new_candidate = candidate_collection.insert_one(candidate_dict)
+        created_candidate = candidate_collection.find_one(
+            {"_id": new_candidate.inserted_id}
+        )
         return created_candidate
     except DuplicateKeyError:
         return JSONResponse(
@@ -103,13 +131,17 @@ def create_candidate(candidate: Candidate, user_email: str = Depends(get_user_em
     status_code=status.HTTP_200_OK,
     response_model=Candidate,
 )
-def get_candidate(candidate_id: str, user_email: str = Depends(get_user_email)):
-    user = USERS.find_one({"email": user_email})
-    print(user_email)
+def get_candidate(
+    request: Request, candidate_id: str, user_email: str = Depends(get_user_email)
+):
+    user_collection = detect_user_context()
+    candidate_collection = detect_candidate_context()
+
+    user = user_collection.find_one({"email": user_email})
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    candidate = CANDIDATES.find_one({"_id": candidate_id})
+    candidate = candidate_collection.find_one({"_id": candidate_id})
     if candidate:
         return candidate
     else:
@@ -125,17 +157,22 @@ def get_candidate(candidate_id: str, user_email: str = Depends(get_user_email)):
     response_model=Candidate,
 )
 def update_candidate(
-    candidate_id: str, candidate: Candidate, user_email: str = Depends(get_user_email)
+    request: Request,
+    candidate_id: str,
+    candidate: Candidate,
+    user_email: str = Depends(get_user_email),
 ):
-    user = USERS.find_one({"email": user_email})
-    print(user_email)
+    user_collection = detect_user_context()
+    candidate_collection = detect_candidate_context()
+
+    user = user_collection.find_one({"email": user_email})
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     update_data = {
         key: value for key, value in jsonable_encoder(candidate).items() if key != "_id"
     }
-    updated_candidate = CANDIDATES.find_one_and_update(
+    updated_candidate = candidate_collection.find_one_and_update(
         {"_id": candidate_id},
         {"$set": update_data},
         return_document=True,
@@ -153,13 +190,17 @@ def update_candidate(
     response_description="Delete a candidate by ID",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_candidate(candidate_id: str, user_email: str = Depends(get_user_email)):
-    user = USERS.find_one({"email": user_email})
-    print(user_email)
+def delete_candidate(
+    request: Request, candidate_id: str, user_email: str = Depends(get_user_email)
+):
+    user_collection = detect_user_context()
+    candidate_collection = detect_candidate_context()
+
+    user = user_collection.find_one({"email": user_email})
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    result = CANDIDATES.delete_one({"_id": candidate_id})
+    result = candidate_collection.delete_one({"_id": candidate_id})
     if result.deleted_count == 1:
         return JSONResponse(
             content={"detail": "Candidate deleted successfully"},
@@ -177,6 +218,7 @@ def delete_candidate(candidate_id: str, user_email: str = Depends(get_user_email
     response_model=List[Candidate],
 )
 def get_all_candidates(
+    request: Request,
     user_email: str = Depends(get_user_email),
     _id: str = Query(None, title="UUID", description="Filter by UUID"),
     first_name: str = Query(
@@ -205,8 +247,10 @@ def get_all_candidates(
         None, title="Keywords", description="Global search using keywords"
     ),
 ):
-    user = USERS.find_one({"email": user_email})
-    print(user_email)
+    user_collection = detect_user_context()
+    candidate_collection = detect_candidate_context()
+
+    user = user_collection.find_one({"email": user_email})
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -260,13 +304,15 @@ def get_all_candidates(
         }
         filters["$or"] = global_search_filters["$or"]
 
-    result = CANDIDATES.find(filters)
+    result = candidate_collection.find(filters)
     return list(result)
 
 
 @router.get("/generate-report")
-async def generate_report():
-    candidates = list(CANDIDATES.find())
+async def generate_report(request: Request):
+    candidate_collection = detect_candidate_context()
+
+    candidates = list(candidate_collection.find())
 
     header = Candidate.model_json_schema()["properties"].keys()
 

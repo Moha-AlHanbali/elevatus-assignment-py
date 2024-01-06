@@ -4,15 +4,16 @@ from fastapi import FastAPI
 from app.routers.routes import router
 from contextlib import asynccontextmanager
 
-from app.internal.database import CLIENT, DB_NAME, DB
+from app.internal.database import CLIENT, DB_NAME, DB, PRODUCTION
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if PRODUCTION.lower() != "true":
+        raise Exception("PLEASE ENABLE PRODUCTION ENVIRONMENT.")
     # Connect to DB
     app.mongodb_client = CLIENT
     app.database = DB
-
     try:
         CLIENT.admin.command("ping")
         print(f"Connected to staging DB ({DB_NAME}) successfully.")
