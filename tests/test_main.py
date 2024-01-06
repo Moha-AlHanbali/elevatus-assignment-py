@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
 
-from app.internal.database import TEST_CLIENT, TEST_DB
+from app.internal.database import TEST_CLIENT, TEST_DB, TEST_DB_NAME
 from app.routers.routes import router
 
 app = FastAPI()
@@ -16,6 +16,8 @@ def test_app():
     with TestClient(app) as client:
         app.mongodb_client = TEST_CLIENT
         app.database = TEST_DB
+
+        print(f"Connected to testing DB ({TEST_DB_NAME}) successfully.")
 
         app.database.drop_collection("user")
         app.database.drop_collection("candidate")

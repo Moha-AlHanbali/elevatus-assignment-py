@@ -1,7 +1,16 @@
 "This module contains thr API routes"
 
 from typing import List
-from fastapi import APIRouter, Body, Query, Request, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    Header,
+    Query,
+    Request,
+    HTTPException,
+    status,
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
 from app.internal.models import User, Candidate
@@ -27,7 +36,6 @@ def health_check():
     response_model=User,
 )
 def create_user(request: Request, user: User = Body(...)):
-
     try:
         existing_emails = [entry["email"] for entry in USERS.find({}, {"email": 1})]
         if user.email in existing_emails:
@@ -50,13 +58,22 @@ def create_user(request: Request, user: User = Body(...)):
         )
 
 
+def get_user_email(authorization: str = Header(...)):
+    return authorization
+
+
 @router.post(
     "/candidate",
     response_description="Create a candidate",
     status_code=status.HTTP_201_CREATED,
     response_model=Candidate,
 )
-def create_candidate(candidate: Candidate):
+def create_candidate(candidate: Candidate, user_email: str = Depends(get_user_email)):
+    user = USERS.find_one({"email": user_email})
+    print(user_email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         existing_emails = [
             entry["email"] for entry in CANDIDATES.find({}, {"email": 1})
@@ -86,7 +103,12 @@ def create_candidate(candidate: Candidate):
     status_code=status.HTTP_200_OK,
     response_model=Candidate,
 )
-def get_candidate(candidate_id: str):
+def get_candidate(candidate_id: str, user_email: str = Depends(get_user_email)):
+    user = USERS.find_one({"email": user_email})
+    print(user_email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     candidate = CANDIDATES.find_one({"_id": candidate_id})
     if candidate:
         return candidate
@@ -102,7 +124,14 @@ def get_candidate(candidate_id: str):
     status_code=status.HTTP_200_OK,
     response_model=Candidate,
 )
-def update_candidate(candidate_id: str, candidate: Candidate):
+def update_candidate(
+    candidate_id: str, candidate: Candidate, user_email: str = Depends(get_user_email)
+):
+    user = USERS.find_one({"email": user_email})
+    print(user_email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     update_data = {
         key: value for key, value in jsonable_encoder(candidate).items() if key != "_id"
     }
@@ -124,7 +153,12 @@ def update_candidate(candidate_id: str, candidate: Candidate):
     response_description="Delete a candidate by ID",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_candidate(candidate_id: str):
+def delete_candidate(candidate_id: str, user_email: str = Depends(get_user_email)):
+    user = USERS.find_one({"email": user_email})
+    print(user_email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     result = CANDIDATES.delete_one({"_id": candidate_id})
     if result.deleted_count == 1:
         return JSONResponse(
@@ -137,13 +171,13 @@ def delete_candidate(candidate_id: str):
         )
 
 
-
 @router.get(
     "/all-candidates",
     response_description="Get all candidates",
     response_model=List[Candidate],
 )
 def get_all_candidates(
+    user_email: str = Depends(get_user_email),
     _id: str = Query(None, title="UUID", description="Filter by UUID"),
     first_name: str = Query(
         None, title="First Name", description="Filter by first name"
@@ -171,6 +205,11 @@ def get_all_candidates(
         None, title="Keywords", description="Global search using keywords"
     ),
 ):
+    user = USERS.find_one({"email": user_email})
+    print(user_email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     filters = {}
     # Add filters for each field
     if _id:
