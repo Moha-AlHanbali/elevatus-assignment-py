@@ -4,12 +4,11 @@ This module contains the API routes.
 It defines routes for health check and provides functionality to detect the user and candidate context based on the production environment.
 """
 
-from typing import List
+from typing import Annotated, List
 from fastapi import (
     APIRouter,
     Body,
     Depends,
-    Header,
     Query,
     Request,
     HTTPException,
@@ -17,8 +16,11 @@ from fastapi import (
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
-from app.internal.models import User, Candidate
+from fastapi.security import OAuth2PasswordBearer
+from app.internal.models import User, Candidate, Auth
 from pymongo.errors import DuplicateKeyError
+from jose import jwt, JWTError
+from dotenv import dotenv_values
 
 from app.internal.database import (
     USERS,
@@ -28,8 +30,13 @@ from app.internal.database import (
     PRODUCTION,
 )
 
+CONFIG = dotenv_values(".env")
+SECRET_KEY = CONFIG["SECRET_KEY"]
+ALGORITHM = CONFIG["ALGORITHM"]
 
 router = APIRouter()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 def detect_user_context():
@@ -60,17 +67,26 @@ def detect_candidate_context():
         return TEST_CANDIDATES
 
 
-def get_user_email(Authorization_Email: str = Header(...)):
-    """
-    Helper function to get the user's email from the Authorization header.
+async def authorize_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
 
-    Args:
-    - Authorization_Email: Header containing the user's email.
+    except JWTError:
+        raise credentials_exception
 
-    Returns:
-    - User's email.
-    """
-    return Authorization_Email
+    user_collection = detect_user_context()
+    user = user_collection.find_one({"email": email})
+    if not user:
+        raise credentials_exception
+    return user["email"]
 
 
 @router.get(
@@ -114,8 +130,13 @@ def create_user(request: Request, user: User = Body(...)):
                 content={"detail": "Email must be unique"}, status_code=400
             )
 
+        # Hash the provided password before storing in the database
+        user.set_password(user.hashed_password)
+
+        # Convert User model to a dictionary
         user_dict = jsonable_encoder(user)
 
+        # Insert the user into the database
         new_user = request.app.database["user"].insert_one(user_dict)
         created_user = request.app.database["user"].find_one(
             {"_id": new_user.inserted_id}
@@ -129,6 +150,28 @@ def create_user(request: Request, user: User = Body(...)):
         )
 
 
+@router.post("/token")
+def generate_token(auth: Auth):
+    # Validate user credentials (replace this with your actual validation logic)
+    user_collection = detect_user_context()
+    user = user_collection.find_one({"email": auth.email})
+    if user is None or not (user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not (auth.get_password(auth.password, user["password"])):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # Generate and return the JWT token
+    access_token = auth.create_access_token(data={"sub": auth.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @router.post(
     "/candidate",
     response_description="Create a candidate",
@@ -136,7 +179,7 @@ def create_user(request: Request, user: User = Body(...)):
     response_model=Candidate,
 )
 def create_candidate(
-    request: Request, candidate: Candidate, user_email: str = Depends(get_user_email)
+    request: Request, candidate: Candidate, user_email: str = Depends(authorize_user)
 ):
     """
     Endpoint for creating a candidate.
@@ -187,7 +230,7 @@ def create_candidate(
     response_model=Candidate,
 )
 def get_candidate(
-    request: Request, candidate_id: str, user_email: str = Depends(get_user_email)
+    request: Request, candidate_id: str, user_email: str = Depends(authorize_user)
 ):
     """
     Endpoint for retrieving a candidate by ID.
@@ -226,7 +269,7 @@ def update_candidate(
     request: Request,
     candidate_id: str,
     candidate: Candidate,
-    user_email: str = Depends(get_user_email),
+    user_email: str = Depends(authorize_user),
 ):
     """
     Endpoint for updating a candidate by ID.
@@ -269,7 +312,7 @@ def update_candidate(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 def delete_candidate(
-    request: Request, candidate_id: str, user_email: str = Depends(get_user_email)
+    request: Request, candidate_id: str, user_email: str = Depends(authorize_user)
 ):
     """
     Endpoint for deleting a candidate by ID.
@@ -308,7 +351,7 @@ def delete_candidate(
 )
 def get_all_candidates(
     request: Request,
-    user_email: str = Depends(get_user_email),
+    user_email: str = Depends(authorize_user),
     _id: str = Query(None, title="UUID", description="Filter by UUID"),
     first_name: str = Query(
         None, title="First Name", description="Filter by first name"
@@ -426,7 +469,7 @@ async def generate_report(
     request: Request,
     page: int = Query(1, gt=0, description="Page number for pagination"),
     page_size: int = Query(10, gt=0, le=100, description="Items per page"),
-    user_email: str = Depends(get_user_email)
+    user_email: str = Depends(authorize_user),
 ):
     """
     Endpoint for generating a report of all candidates in CSV format.

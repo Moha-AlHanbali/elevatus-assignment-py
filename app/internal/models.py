@@ -2,9 +2,22 @@
 This module contains the DB models.
 """
 
+from datetime import timedelta, datetime
 from pydantic import BaseModel, Field, EmailStr
+from passlib.context import CryptContext
 from typing import List, Literal
 from uuid import uuid4
+from dotenv import dotenv_values
+from jose import jwt
+
+
+CONFIG = dotenv_values(".env")
+SECRET_KEY = CONFIG["SECRET_KEY"]
+ALGORITHM = CONFIG["ALGORITHM"]
+ACCESS_TOKEN_EXPIRE_MINUTES = int(CONFIG["ACCESS_TOKEN_EXPIRE_MINUTES"])
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class User(BaseModel):
@@ -16,10 +29,11 @@ class User(BaseModel):
     - first_name: User's first name.
     - last_name: User's last name.
     - email: User's email address.
+    - hashed_password: Hashed password.
 
-    ConfigDict:
-    - populate_by_name: Enables populating the model from dictionary keys.
-    - json_schema_extra: Additional JSON schema information, including an example.
+    Config:
+    - alias: Alias for the "_id" field.
+    - json_extra: Additional JSON schema information, including an example.
     """
     uuid: str = Field(
         default_factory=lambda: str(uuid4()),
@@ -29,16 +43,43 @@ class User(BaseModel):
     first_name: str = Field(..., description="User's first name")
     last_name: str = Field(..., description="User's last name")
     email: EmailStr = Field(..., description="User's email address")
+    hashed_password: str = Field(..., alias="password",description="Hashed password")
 
-    class ConfigDict:
-        populate_by_name = True
-        json_schema_extra = {
+    class Config:
+        alias = {"uuid": "_id"}
+        json_extra = {
             "example": {
                 "first_name": "Some First Name",
                 "last_name": "Some Last Name",
                 "email": "somemail@domain.com",
             }
         }
+        exclude = {"hashed_password"}
+    
+    def set_password(self, password: str):
+        """
+        Hash and set the user's password.
+        """
+        self.hashed_password = pwd_context.hash(password)
+
+
+class Auth(BaseModel):
+    email: str
+    password: str
+
+
+    @staticmethod
+    def create_access_token(data: dict):
+        expires = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        to_encode = {"exp": expires, **data}
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        return encoded_jwt
+
+    def get_password(self, password: str, hashed_password: str):
+        """
+        Get hashed user password.
+        """
+        return pwd_context.verify(password, hashed_password)
 
 
 class Candidate(BaseModel):
@@ -64,10 +105,11 @@ class Candidate(BaseModel):
     - populate_by_name: Enables populating the model from dictionary keys.
     - json_schema_extra: Additional JSON schema information, including an example.
     """
+
     uuid: str = Field(
         default_factory=lambda: str(uuid4()),
         alias="_id",
-        description="Candidate's UUID"
+        description="Candidate's UUID",
     )
     first_name: str = Field(..., description="Candidate's first name")
     last_name: str = Field(..., description="Candidate's last name")

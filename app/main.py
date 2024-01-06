@@ -4,11 +4,15 @@ This module is the entry point to the assignment project.
 It initializes a FastAPI instance with database connection setup and checks for the production environment.
 """
 
+import logging
 from fastapi import FastAPI
 from app.routers.routes import router
 from contextlib import asynccontextmanager
 
 from app.internal.database import CLIENT, DB_NAME, DB, PRODUCTION
+
+# Just to silence this warning mentioned here: https://github.com/pyca/bcrypt/issues/684
+logging.getLogger('passlib').setLevel(logging.ERROR)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
