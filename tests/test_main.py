@@ -1,3 +1,7 @@
+"""
+This module contains unit tests for the application.
+"""
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
@@ -49,54 +53,60 @@ def test_create_user_unique_email(test_app):
     )
     assert response.status_code == 201
 
+
 def test_create_user_duplicate_email(test_app):
     # First, create a user with a unique email
     response = test_app.post(
         "/user",
-        json={"first_name": "John", "last_name": "Doe", "email": "john.doe@example.com"},
+        json={
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john.doe@example.com",
+        },
     )
     assert response.status_code == 201
 
     # Attempt to create a user with the same email
     response = test_app.post(
         "/user",
-        json={"first_name": "Jane", "last_name": "Doe", "email": "john.doe@example.com"},
+        json={
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "email": "john.doe@example.com",
+        },
     )
     assert response.status_code == 400
     assert "Email must be unique" in response.json()["detail"]
 
 
-
 def test_create_candidate(test_app):
-
     candidate_data = {
-            "first_name": "John",
-            "last_name": "Doe",
-            "email": "john.doe@example.com",
-            "career_level": "Senior",
-            "job_major": "Computer Science",
-            "years_of_experience": 3,
-            "degree_type": "Bachelor",
-            "skills": ["Python", "RUBY", "Java"],
-            "nationality": "US",
-            "city": "NY",
-            "salary": 2500000.0,
-            "gender": "Male"
-        }
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "john.doe@example.com",
+        "career_level": "Senior",
+        "job_major": "Computer Science",
+        "years_of_experience": 3,
+        "degree_type": "Bachelor",
+        "skills": ["Python", "RUBY", "Java"],
+        "nationality": "US",
+        "city": "NY",
+        "salary": 2500000.0,
+        "gender": "Male",
+    }
     authorization_email = {"Authorization-Email": "useremail@example.com"}
 
     invalid_authorization_email = {"Authorization-Email": "somemail@invalid.com"}
+
+    # Test with invalid authorization email
     response = test_app.post(
-        "/candidate",
-        json=candidate_data,
-        headers = invalid_authorization_email
+        "/candidate", json=candidate_data, headers=invalid_authorization_email
     )
     assert response.status_code == 401
 
+    # Test with valid authorization email
     response = test_app.post(
-        "/candidate",
-        json=candidate_data,
-        headers = authorization_email
+        "/candidate", json=candidate_data, headers=authorization_email
     )
     candidate_test_id["value"] = response.json()["_id"]
 
@@ -105,6 +115,7 @@ def test_create_candidate(test_app):
     assert "last_name" in response.json()
     assert "email" in response.json()
 
+
 def test_get_candidate(test_app):
     assert candidate_test_id["value"] is not None
 
@@ -112,50 +123,54 @@ def test_get_candidate(test_app):
 
     invalid_authorization_email = {"Authorization-Email": "somemail@invalid.com"}
 
-    response = test_app.get(f"/candidate/{candidate_test_id["value"]}",
-    headers = invalid_authorization_email
+    # Test with invalid authorization email
+    response = test_app.get(
+        f"/candidate/{candidate_test_id['value']}", headers=invalid_authorization_email
     )
     assert response.status_code == 401
 
-    response = test_app.get(f"/candidate/{candidate_test_id["value"]}",
-    headers = authorization_email
+    # Test with valid authorization email
+    response = test_app.get(
+        f"/candidate/{candidate_test_id['value']}", headers=authorization_email
     )
     assert response.status_code == 200
     assert "first_name" in response.json()
     assert "last_name" in response.json()
     assert "email" in response.json()
 
+
 def test_update_candidate(test_app):
     candidate_data = {
-            "first_name": "Mark",
-            "last_name": "Smith",
-            "email": "mark.doe@example.com",
-            "career_level": "Junior",
-            "job_major": "Computer Science",
-            "years_of_experience": 1,
-            "degree_type": "Bachelor",
-            "skills": ["Javascript"],
-            "nationality": "US",
-            "city": "CA",
-            "salary": 600000,
-            "gender": "Male"
-        }
+        "first_name": "Mark",
+        "last_name": "Smith",
+        "email": "mark.doe@example.com",
+        "career_level": "Junior",
+        "job_major": "Computer Science",
+        "years_of_experience": 1,
+        "degree_type": "Bachelor",
+        "skills": ["Javascript"],
+        "nationality": "US",
+        "city": "CA",
+        "salary": 600000,
+        "gender": "Male",
+    }
     authorization_email = {"Authorization-Email": "useremail@example.com"}
 
     invalid_authorization_email = {"Authorization-Email": "somemail@invalid.com"}
 
+    # Test with invalid authorization email
     response = test_app.put(
-        f"/candidate/{candidate_test_id["value"]}",
+        f"/candidate/{candidate_test_id['value']}",
         json=candidate_data,
-        headers = invalid_authorization_email
+        headers=invalid_authorization_email,
     )
     assert response.status_code == 401
 
-
+    # Test with valid authorization email
     response = test_app.put(
-        f"/candidate/{candidate_test_id["value"]}",
+        f"/candidate/{candidate_test_id['value']}",
         json=candidate_data,
-        headers = authorization_email
+        headers=authorization_email,
     )
     assert response.status_code == 200
     assert "first_name" in response.json()
@@ -165,28 +180,31 @@ def test_update_candidate(test_app):
     assert "email" in response.json()
     assert response.json()["email"] == "mark.doe@example.com"
 
-def test_delete_candidate(test_app):
 
+def test_delete_candidate(test_app):
     authorization_email = {"Authorization-Email": "useremail@example.com"}
 
     invalid_authorization_email = {"Authorization-Email": "somemail@invalid.com"}
 
-    response = test_app.delete(f"/candidate/{candidate_test_id["value"]}", 
-                               headers = invalid_authorization_email)
+    # Test with invalid authorization email
+    response = test_app.delete(
+        f"/candidate/{candidate_test_id['value']}", headers=invalid_authorization_email
+    )
     assert response.status_code == 401
 
-    response = test_app.delete(f"/candidate/{candidate_test_id["value"]}", 
-                               headers = authorization_email)
+    # Test with valid authorization email
+    response = test_app.delete(
+        f"/candidate/{candidate_test_id['value']}", headers=authorization_email
+    )
     assert response.status_code == 204
 
 
-
 def test_get_all_candidates(test_app):
-
     authorization_email = {"Authorization-Email": "useremail@example.com"}
 
     invalid_authorization_email = {"Authorization-Email": "somemail@invalid.com"}
-    
+
+    # Create test candidates
     test_app.post(
         "/candidate",
         json={
@@ -203,8 +221,7 @@ def test_get_all_candidates(test_app):
             "salary": 100000.0,
             "gender": "Male",
         },
-        headers = authorization_email
-
+        headers=authorization_email,
     )
     test_app.post(
         "/candidate",
@@ -222,52 +239,55 @@ def test_get_all_candidates(test_app):
             "salary": 80000.0,
             "gender": "Female",
         },
-        headers = authorization_email
-
+        headers=authorization_email,
     )
 
-    # Test global search with keywords
-    response = test_app.get("/all-candidates?keywords=John",
-    headers = invalid_authorization_email
+    # Test global search with keywords (invalid authorization email)
+    response = test_app.get(
+        "/all-candidates?keywords=John", headers=invalid_authorization_email
     )
     assert response.status_code == 401
 
-    response = test_app.get("/all-candidates?keywords=John",
-    headers = authorization_email
+    # Test global search with keywords (valid authorization email)
+    response = test_app.get(
+        "/all-candidates?keywords=John", headers=authorization_email
     )
     assert response.status_code == 200
     assert response.json()[0]["first_name"] == "John"
 
     # Test regular filters
-    response = test_app.get("/all-candidates?career_level=Senior&city=NY",
-    headers = authorization_email
+    response = test_app.get(
+        "/all-candidates?career_level=Senior&city=NY", headers=authorization_email
     )
     assert response.status_code == 200
     assert response.json()[0]["first_name"] == "John"
 
     # Test global search with keywords and regular filters
-    response = test_app.get("/all-candidates?keywords=Doe&city=SF",
-    headers = authorization_email
+    response = test_app.get(
+        "/all-candidates?keywords=Doe&city=SF", headers=authorization_email
     )
     assert response.status_code == 200
     assert response.json()[0]["first_name"] == "Jane"
 
     # Test when no candidates match the criteria
-    response = test_app.get("/all-candidates?keywords=InvalidName",
-    headers = authorization_email
+    response = test_app.get(
+        "/all-candidates?keywords=InvalidName", headers=authorization_email
     )
     assert response.status_code == 200
     assert len(response.json()) == 0
 
-    query_string = (
-        """first_name=Jane&last_name=Doe&email=jane.doe@example.com&career_level=Junior&job_major=Computer%20Information%20Systems&years_of_experience=2&degree_type=Master&nationality=US&city=SF"""
-    )
+    # Test with query string
+    query_string = """first_name=Jane&last_name=Doe&email=jane.doe@example.com&career_level=Junior&job_major=Computer%20Information%20Systems&years_of_experience=2&degree_type=Master&nationality=US&city=SF"""
 
-    response = test_app.get(f"/all-candidates?{query_string}", headers=authorization_email)
+    response = test_app.get(
+        f"/all-candidates?{query_string}", headers=authorization_email
+    )
     assert response.status_code == 200
     assert response.json()[0]["first_name"] == "Jane"
-    
+
+
 def test_generate_report(test_app):
+    # Create test candidates
     test_candidates = [
         {
             "first_name": "csvJohn",
@@ -299,10 +319,11 @@ def test_generate_report(test_app):
         },
     ]
 
+    # Create test candidates in the database
     for candidate_data in test_candidates:
-        test_app.post("/candidate",json = candidate_data)
+        test_app.post("/candidate", json=candidate_data)
 
-                
+    # Make a request to generate the report
     response = test_app.get("/generate-report")
 
     # Assert the response status code
@@ -315,13 +336,16 @@ def test_generate_report(test_app):
         == "attachment; filename=candidates_report.csv"
     )
 
+    # Assert the content of the CSV file
     expected_headers = "_id,first_name,last_name,email,career_level,job_major,years_of_experience,degree_type,skills,nationality,city,salary,gender\n"
     assert response.text.startswith(expected_headers)
 
+    # You can add additional assertions based on the expected content of the report
+
 
 def test_cleanup(test_app):
+    # Drop the user and candidate collections in the testing database
     app.database.drop_collection("user")
     app.database.drop_collection("candidate")
     test_app.close()
     print(f"Disconnected from testing DB ({TEST_DB_NAME}) successfully.")
-

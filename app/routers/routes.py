@@ -1,4 +1,8 @@
-"This module contains thr API routes"
+"""
+This module contains the API routes.
+
+It defines routes for health check and provides functionality to detect the user and candidate context based on the production environment.
+"""
 
 from typing import List
 from fastapi import (
@@ -16,27 +20,69 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.internal.models import User, Candidate
 from pymongo.errors import DuplicateKeyError
 
-from app.internal.database import USERS, CANDIDATES, TEST_USERS, TEST_CANDIDATES, PRODUCTION
+from app.internal.database import (
+    USERS,
+    CANDIDATES,
+    TEST_USERS,
+    TEST_CANDIDATES,
+    PRODUCTION,
+)
+
 
 router = APIRouter()
 
+
 def detect_user_context():
+    """
+    Detects the user context based on the production environment.
+
+    Returns:
+    - USERS collection for production.
+    - TEST_USERS collection for testing.
+    """
     if PRODUCTION == "true":
         return USERS
     else:
         return TEST_USERS
 
+
 def detect_candidate_context():
+    """
+    Detects the candidate context based on the production environment.
+
+    Returns:
+    - CANDIDATES collection for production.
+    - TEST_CANDIDATES collection for testing.
+    """
     if PRODUCTION == "true":
         return CANDIDATES
     else:
         return TEST_CANDIDATES
 
 
+def get_user_email(Authorization_Email: str = Header(...)):
+    """
+    Helper function to get the user's email from the Authorization header.
+
+    Args:
+    - Authorization_Email: Header containing the user's email.
+
+    Returns:
+    - User's email.
+    """
+    return Authorization_Email
+
+
 @router.get(
     "/health", response_description="Health Check", status_code=status.HTTP_200_OK
 )
 def health_check():
+    """
+    Endpoint for performing a health check.
+
+    Returns:
+    - JSON response indicating the status as "ok".
+    """
     return {"status": "ok"}
 
 
@@ -47,6 +93,16 @@ def health_check():
     response_model=User,
 )
 def create_user(request: Request, user: User = Body(...)):
+    """
+    Endpoint for creating a user.
+
+    Args:
+    - request: FastAPI request object.
+    - user: User model for the new user.
+
+    Returns:
+    - JSON response containing the created user.
+    """
     try:
         user_collection = detect_user_context()
 
@@ -73,10 +129,6 @@ def create_user(request: Request, user: User = Body(...)):
         )
 
 
-def get_user_email(Authorization_Email: str = Header(...)):
-    return Authorization_Email
-
-
 @router.post(
     "/candidate",
     response_description="Create a candidate",
@@ -86,6 +138,17 @@ def get_user_email(Authorization_Email: str = Header(...)):
 def create_candidate(
     request: Request, candidate: Candidate, user_email: str = Depends(get_user_email)
 ):
+    """
+    Endpoint for creating a candidate.
+
+    Args:
+    - request: FastAPI request object.
+    - candidate: Candidate model for the new candidate.
+    - user_email: User's email obtained from the Authorization header.
+
+    Returns:
+    - JSON response containing the created candidate.
+    """
     user_collection = detect_user_context()
     user = user_collection.find_one({"email": user_email})
     if not user:
@@ -126,6 +189,17 @@ def create_candidate(
 def get_candidate(
     request: Request, candidate_id: str, user_email: str = Depends(get_user_email)
 ):
+    """
+    Endpoint for retrieving a candidate by ID.
+
+    Args:
+    - request: FastAPI request object.
+    - candidate_id: ID of the candidate to be retrieved.
+    - user_email: User's email obtained from the Authorization header.
+
+    Returns:
+    - JSON response containing the retrieved candidate.
+    """
     user_collection = detect_user_context()
     candidate_collection = detect_candidate_context()
 
@@ -154,6 +228,18 @@ def update_candidate(
     candidate: Candidate,
     user_email: str = Depends(get_user_email),
 ):
+    """
+    Endpoint for updating a candidate by ID.
+
+    Args:
+    - request: FastAPI request object.
+    - candidate_id: ID of the candidate to be updated.
+    - candidate: Updated Candidate model.
+    - user_email: User's email obtained from the Authorization header.
+
+    Returns:
+    - JSON response containing the updated candidate.
+    """
     user_collection = detect_user_context()
     candidate_collection = detect_candidate_context()
 
@@ -185,6 +271,17 @@ def update_candidate(
 def delete_candidate(
     request: Request, candidate_id: str, user_email: str = Depends(get_user_email)
 ):
+    """
+    Endpoint for deleting a candidate by ID.
+
+    Args:
+    - request: FastAPI request object.
+    - candidate_id: ID of the candidate to be deleted.
+    - user_email: User's email obtained from the Authorization header.
+
+    Returns:
+    - JSON response indicating successful deletion or not found.
+    """
     user_collection = detect_user_context()
     candidate_collection = detect_candidate_context()
 
@@ -239,6 +336,30 @@ def get_all_candidates(
         None, title="Keywords", description="Global search using keywords"
     ),
 ):
+    """
+    Endpoint for retrieving all candidates with optional filters.
+
+    Args:
+    - request: FastAPI request object.
+    - user_email: User's email obtained from the Authorization header.
+    - _id: Filter by candidate UUID.
+    - first_name: Filter by candidate first name.
+    - last_name: Filter by candidate last name.
+    - email: Filter by candidate email.
+    - career_level: Filter by candidate career level.
+    - job_major: Filter by candidate job major.
+    - years_of_experience: Filter by candidate years of experience.
+    - degree_type: Filter by candidate degree type.
+    - skills: Filter by candidate skills.
+    - nationality: Filter by candidate nationality.
+    - city: Filter by candidate city.
+    - salary: Filter by candidate salary.
+    - gender: Filter by candidate gender.
+    - keywords: Global search using keywords.
+
+    Returns:
+    - List of candidates matching the specified filters.
+    """
     user_collection = detect_user_context()
     candidate_collection = detect_candidate_context()
 
@@ -301,10 +422,37 @@ def get_all_candidates(
 
 
 @router.get("/generate-report")
-async def generate_report(request: Request):
+async def generate_report(
+    request: Request,
+    page: int = Query(1, gt=0, description="Page number for pagination"),
+    page_size: int = Query(10, gt=0, le=100, description="Items per page"),
+    user_email: str = Depends(get_user_email)
+):
+    """
+    Endpoint for generating a report of all candidates in CSV format.
+
+    Args:
+    - request: FastAPI request object.
+    - page: Page number for pagination (default: 1).
+    - page_size: Items per page (default: 10, max: 100).
+
+    Returns:
+    - StreamingResponse: CSV file containing candidate information.
+    """
+
+    user_collection = detect_user_context()
     candidate_collection = detect_candidate_context()
 
-    candidates = list(candidate_collection.find())
+    user = user_collection.find_one({"email": user_email})
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # Calculate skip and limit based on pagination parameters
+    skip = (page - 1) * page_size
+    limit = page_size
+
+    # Fetch candidates based on pagination
+    candidates = list(candidate_collection.find().skip(skip).limit(limit))
 
     header = Candidate.model_json_schema()["properties"].keys()
 
