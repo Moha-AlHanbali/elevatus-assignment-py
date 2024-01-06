@@ -1,12 +1,11 @@
 "This module contains thr API routes"
 
 from typing import List
-from fastapi import APIRouter, Body, Query, Request, Response, HTTPException, status
+from fastapi import APIRouter, Body, Query, Request, HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from app.internal.models import User, Candidate
 from pymongo.errors import DuplicateKeyError
-from bson.regex import Regex
 
 from app.internal.database import USERS, CANDIDATES
 
@@ -28,6 +27,7 @@ def health_check():
     response_model=User,
 )
 def create_user(request: Request, user: User = Body(...)):
+
     try:
         existing_emails = [entry["email"] for entry in USERS.find({}, {"email": 1})]
         if user.email in existing_emails:
@@ -137,24 +137,39 @@ def delete_candidate(candidate_id: str):
         )
 
 
-# Assume CANDIDATES is the collection of candidates
 
-@router.get("/all-candidates", response_description="Get all candidates", response_model=List[Candidate])
+@router.get(
+    "/all-candidates",
+    response_description="Get all candidates",
+    response_model=List[Candidate],
+)
 def get_all_candidates(
-    _id:  str = Query(None, title="UUID", description="Filter by UUID"),
-    first_name: str = Query(None, title="First Name", description="Filter by first name"),
+    _id: str = Query(None, title="UUID", description="Filter by UUID"),
+    first_name: str = Query(
+        None, title="First Name", description="Filter by first name"
+    ),
     last_name: str = Query(None, title="Last Name", description="Filter by last name"),
     email: str = Query(None, title="Email", description="Filter by email"),
-    career_level: str = Query(None, title="Career Level", description="Filter by career level"),
+    career_level: str = Query(
+        None, title="Career Level", description="Filter by career level"
+    ),
     job_major: str = Query(None, title="Job Major", description="Filter by job major"),
-    years_of_experience: int = Query(None, title="Years of Experience", description="Filter by years of experience"),
-    degree_type: str = Query(None, title="Degree Type", description="Filter by degree type"),
+    years_of_experience: int = Query(
+        None, title="Years of Experience", description="Filter by years of experience"
+    ),
+    degree_type: str = Query(
+        None, title="Degree Type", description="Filter by degree type"
+    ),
     skills: List[str] = Query(None, title="Skills", description="Filter by skills"),
-    nationality: str = Query(None, title="Nationality", description="Filter by nationality"),
+    nationality: str = Query(
+        None, title="Nationality", description="Filter by nationality"
+    ),
     city: str = Query(None, title="City", description="Filter by city"),
     salary: float = Query(None, title="Salary", description="Filter by salary"),
     gender: List[str] = Query(None, title="Gender", description="Filter by gender"),
-    keywords: str = Query(None, title="Keywords", description="Global search using keywords"),
+    keywords: str = Query(
+        None, title="Keywords", description="Global search using keywords"
+    ),
 ):
     filters = {}
     # Add filters for each field
@@ -202,10 +217,31 @@ def get_all_candidates(
                 {"skills": {"$in": [keywords]}},
                 {"gender": {"$regex": keywords, "$options": "i"}},
                 {"salary": {"$regex": str(keywords), "$options": "i"}},
-                # Add more fields for global search
             ]
         }
         filters["$or"] = global_search_filters["$or"]
 
     result = CANDIDATES.find(filters)
     return list(result)
+
+
+@router.get("/generate-report")
+async def generate_report():
+    candidates = list(CANDIDATES.find())
+
+    header = Candidate.model_json_schema()["properties"].keys()
+
+    def generate_csv():
+        yield ",".join(header) + "\n"
+
+        for candidate in candidates:
+            candidate_info = [str(candidate.get(field, "")) for field in header]
+            yield ",".join(candidate_info) + "\n"
+
+    response = StreamingResponse(
+        generate_csv(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=candidates_report.csv"},
+    )
+
+    return response

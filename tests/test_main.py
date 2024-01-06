@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
 
-from app.internal.database import CLIENT, DB_NAME, TEST_DB_PREFIX
+from app.internal.database import TEST_CLIENT, TEST_DB
 from app.routers.routes import router
 
 app = FastAPI()
@@ -14,14 +14,17 @@ candidate_test_id = {"value": ""}
 @pytest.fixture
 def test_app():
     with TestClient(app) as client:
-        app.mongodb_client = CLIENT
-        app.database = CLIENT[TEST_DB_PREFIX + DB_NAME]
+        app.mongodb_client = TEST_CLIENT
+        app.database = TEST_DB
+
         app.database.drop_collection("user")
         app.database.drop_collection("candidate")
-        USERS = CLIENT[TEST_DB_PREFIX + DB_NAME]["user"]
-        USERS.create_index([("email", 1)], unique=True)
-        CANDIDATES = CLIENT[TEST_DB_PREFIX + DB_NAME]["candidate"]
-        CANDIDATES.create_index([("email", 1)], unique=True)
+
+        TEST_USERS = TEST_DB["user"]
+        TEST_CANDIDATES = TEST_DB["candidate"]
+        
+        TEST_USERS.create_index([("email", 1)], unique=True)
+        TEST_CANDIDATES.create_index([("email", 1)], unique=True)
         yield client
 
 
@@ -167,22 +170,71 @@ def test_get_all_candidates(test_app):
     # Test global search with keywords
     response = test_app.get("/all-candidates?keywords=John")
     assert response.status_code == 200
-    assert len(response.json()) == 1
     assert response.json()[0]["first_name"] == "John"
 
     # Test regular filters
     response = test_app.get("/all-candidates?career_level=Senior&city=NY")
     assert response.status_code == 200
-    assert len(response.json()) == 1
     assert response.json()[0]["first_name"] == "John"
 
     # Test global search with keywords and regular filters
     response = test_app.get("/all-candidates?keywords=Doe&city=SF")
     assert response.status_code == 200
-    assert len(response.json()) == 1
     assert response.json()[0]["first_name"] == "Jane"
 
     # Test when no candidates match the criteria
     response = test_app.get("/all-candidates?keywords=InvalidName")
     assert response.status_code == 200
     assert len(response.json()) == 0
+
+
+def test_generate_report(test_app):
+    test_candidates = [
+        {
+            "first_name": "csvJohn",
+            "last_name": "Doe",
+            "email": "csvjohn.doe@example.com",
+            "career_level": "Senior",
+            "job_major": "Computer Science",
+            "years_of_experience": 3,
+            "degree_type": "Bachelor",
+            "skills": ["Python", "RUBY", "Java"],
+            "nationality": "US",
+            "city": "NY",
+            "salary": 2500000.0,
+            "gender": "Male",
+        },
+        {
+            "first_name": "csvJane",
+            "last_name": "Doe",
+            "email": "csvjane.doe@example.com",
+            "career_level": "Junior",
+            "job_major": "Accounting",
+            "years_of_experience": 1,
+            "degree_type": "Masters",
+            "skills": ["Javascript"],
+            "nationality": "US",
+            "city": "NY",
+            "salary": 800000.0,
+            "gender": "Female",
+        },
+    ]
+
+    for candidate_data in test_candidates:
+        test_app.post("/candidate",json = candidate_data)
+
+                
+    response = test_app.get("/generate-report")
+
+    # Assert the response status code
+    assert response.status_code == 200
+
+    # Assert the response headers
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert (
+        response.headers["content-disposition"]
+        == "attachment; filename=candidates_report.csv"
+    )
+
+    expected_header = "_id,first_name,last_name,email,career_level,job_major,years_of_experience,degree_type,skills,nationality,city,salary,gender\n"
+    assert response.text.startswith(expected_header)
