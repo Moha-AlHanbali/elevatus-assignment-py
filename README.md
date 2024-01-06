@@ -75,7 +75,7 @@ This project is the implementation of the Elevatus Technical Assignment for a Py
 
 ## Keynotes About the Implementation
 
-1. `UUID` fields for both `user` and `candidate` collections are system-handled and auto generated.
+1. `UUID` fields for both `user` and `candidate` collections are system-handled and auto generated, which are also used as the `ID` query parameter in the APIs.
 2. `Email` field was set as a unique field in both collections as well (each separately).
 3. The required authorization was handled by requesting the user email in `Authorization-Email` header (no authentication implemented).
 
