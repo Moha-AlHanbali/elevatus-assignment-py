@@ -9,14 +9,14 @@ from app.internal.database import CLIENT, DB_NAME, DB, PRODUCTION
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if PRODUCTION.lower() != "true":
+    if PRODUCTION != "true":
         raise Exception("PLEASE ENABLE PRODUCTION ENVIRONMENT.")
     # Connect to DB
     app.mongodb_client = CLIENT
     app.database = DB
     try:
         CLIENT.admin.command("ping")
-        print(f"Connected to staging DB ({DB_NAME}) successfully.")
+        print(f"Connected to production DB ({DB_NAME}) successfully.")
     except Exception as e:
         print(e)
 
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown connection
     CLIENT.close()
-    print(f"Disconnected from staging DB ({DB_NAME}) successfully.")
+    print(f"Disconnected from production DB ({DB_NAME}) successfully.")
 
 
 app = FastAPI(

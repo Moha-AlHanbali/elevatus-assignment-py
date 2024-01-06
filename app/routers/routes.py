@@ -1,7 +1,6 @@
 "This module contains thr API routes"
 
 from typing import List
-from dotenv import dotenv_values
 from fastapi import (
     APIRouter,
     Body,
@@ -17,27 +16,21 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.internal.models import User, Candidate
 from pymongo.errors import DuplicateKeyError
 
-from app.internal.database import USERS, CANDIDATES, TEST_USERS, TEST_CANDIDATES
+from app.internal.database import USERS, CANDIDATES, TEST_USERS, TEST_CANDIDATES, PRODUCTION
 
 router = APIRouter()
 
-CONFIG = dotenv_values(".env")
-PRODUCTION = CONFIG["PRODUCTION"]
-
 def detect_user_context():
-    if PRODUCTION.lower == "true":
-        user_collection = USERS
+    if PRODUCTION == "true":
+        return USERS
     else:
-        user_collection = TEST_USERS
-    return user_collection
-
+        return TEST_USERS
 
 def detect_candidate_context():
-    if PRODUCTION.lower == "true":
-        candidate_collection = CANDIDATES
+    if PRODUCTION == "true":
+        return CANDIDATES
     else:
-        candidate_collection = TEST_CANDIDATES
-    return candidate_collection
+        return TEST_CANDIDATES
 
 
 @router.get(
@@ -94,7 +87,6 @@ def create_candidate(
     request: Request, candidate: Candidate, user_email: str = Depends(get_user_email)
 ):
     user_collection = detect_user_context()
-
     user = user_collection.find_one({"email": user_email})
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")

@@ -28,4 +28,4 @@ TEST_CANDIDATES = TEST_DB["candidate"]
 TEST_USERS.create_index([("email", 1)], unique=True)
 TEST_CANDIDATES.create_index([("email", 1)], unique=True)
 
-PRODUCTION = CONFIG["PRODUCTION"]
+PRODUCTION = CONFIG["PRODUCTION"].lower().strip()

@@ -15,7 +15,7 @@ candidate_test_id = {"value": ""}
 @pytest.fixture
 def test_app():
     with TestClient(app) as client:
-        if PRODUCTION.lower() != "false":
+        if PRODUCTION != "false":
             raise Exception("PLEASE DISABLE PRODUCTION ENVIRONMENT.")
         app.mongodb_client = TEST_CLIENT
         app.database = TEST_DB
@@ -323,5 +323,5 @@ def test_cleanup(test_app):
     app.database.drop_collection("user")
     app.database.drop_collection("candidate")
     test_app.close()
-    print(f"Disconnected to testing DB ({TEST_DB_NAME}) successfully.")
+    print(f"Disconnected from testing DB ({TEST_DB_NAME}) successfully.")
 
