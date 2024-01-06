@@ -7,18 +7,11 @@ from pydantic import BaseModel, Field, EmailStr
 from passlib.context import CryptContext
 from typing import List, Literal
 from uuid import uuid4
-from dotenv import dotenv_values
+from app.internal.settings import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from jose import jwt
 
 
-CONFIG = dotenv_values(".env")
-SECRET_KEY = CONFIG["SECRET_KEY"]
-ALGORITHM = CONFIG["ALGORITHM"]
-ACCESS_TOKEN_EXPIRE_MINUTES = int(CONFIG["ACCESS_TOKEN_EXPIRE_MINUTES"])
-
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 class User(BaseModel):
     """
@@ -62,11 +55,9 @@ class User(BaseModel):
         """
         self.hashed_password = pwd_context.hash(password)
 
-
 class Auth(BaseModel):
     email: str
     password: str
-
 
     @staticmethod
     def create_access_token(data: dict):
@@ -80,7 +71,6 @@ class Auth(BaseModel):
         Get hashed user password.
         """
         return pwd_context.verify(password, hashed_password)
-
 
 class Candidate(BaseModel):
     """

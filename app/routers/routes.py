@@ -20,19 +20,16 @@ from fastapi.security import OAuth2PasswordBearer
 from app.internal.models import User, Candidate, Auth
 from pymongo.errors import DuplicateKeyError
 from jose import jwt, JWTError
-from dotenv import dotenv_values
 
-from app.internal.database import (
+from app.internal.settings import (
     USERS,
     CANDIDATES,
     TEST_USERS,
     TEST_CANDIDATES,
     PRODUCTION,
+    SECRET_KEY,
+    ALGORITHM,
 )
-
-CONFIG = dotenv_values(".env")
-SECRET_KEY = CONFIG["SECRET_KEY"]
-ALGORITHM = CONFIG["ALGORITHM"]
 
 router = APIRouter()
 
@@ -68,24 +65,48 @@ def detect_candidate_context():
 
 
 async def authorize_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    """
+    Authorizes a user based on the provided JWT token.
+
+    Args:
+    - token: JWT token obtained from the Authorization header.
+
+    Returns:
+    - The user's email if the token is valid and the user exists.
+
+    Raises:
+    - HTTPException 401 UNAUTHORIZED: If the token is invalid or the user does not exist.
+    """
+
+    # Define an exception for credentials validation failure
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
+        # Decode the JWT token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+
+        # Check if email is present in the token
         if email is None:
             raise credentials_exception
 
     except JWTError:
+        # Raise exception if decoding fails
         raise credentials_exception
 
+    # Query the user collection to check if the user exists
     user_collection = detect_user_context()
     user = user_collection.find_one({"email": email})
+
+    # Raise exception if user is not found
     if not user:
         raise credentials_exception
+
+    # Return the user's email if the token is valid
     return user["email"]
 
 
@@ -152,23 +173,42 @@ def create_user(request: Request, user: User = Body(...)):
 
 @router.post("/token")
 def generate_token(auth: Auth):
-    # Validate user credentials (replace this with your actual validation logic)
+    """
+    Endpoint for generating a JWT token based on user credentials.
+
+    Args:
+    - auth: Authentication model containing email and password.
+
+    Returns:
+    - JSON response containing the generated JWT token.
+
+    Raises:
+    - HTTPException 401 UNAUTHORIZED: If the provided credentials are invalid.
+    """
+
+    # Validate user credentials
     user_collection = detect_user_context()
     user = user_collection.find_one({"email": auth.email})
-    if user is None or not (user["password"]):
+    if user is None or not (user.get("password")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not (auth.get_password(auth.password, user["password"])):
+
+    # Verify the hashed password
+    if not auth.get_password(auth.password, user["password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     # Generate and return the JWT token
-    access_token = auth.create_access_token(data={"sub": auth.email})
+    email = auth.email
+    access_token = auth.create_access_token(
+        data={"sub": email}
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -187,7 +227,7 @@ def create_candidate(
     Args:
     - request: FastAPI request object.
     - candidate: Candidate model for the new candidate.
-    - user_email: User's email obtained from the Authorization header.
+    - user_email: User's email obtained from the Token Authentication.
 
     Returns:
     - JSON response containing the created candidate.
@@ -238,7 +278,7 @@ def get_candidate(
     Args:
     - request: FastAPI request object.
     - candidate_id: ID of the candidate to be retrieved.
-    - user_email: User's email obtained from the Authorization header.
+    - user_email: User's email obtained from the Token Authentication.
 
     Returns:
     - JSON response containing the retrieved candidate.
@@ -266,7 +306,6 @@ def get_candidate(
     response_model=Candidate,
 )
 def update_candidate(
-    request: Request,
     candidate_id: str,
     candidate: Candidate,
     user_email: str = Depends(authorize_user),
@@ -275,10 +314,9 @@ def update_candidate(
     Endpoint for updating a candidate by ID.
 
     Args:
-    - request: FastAPI request object.
     - candidate_id: ID of the candidate to be updated.
     - candidate: Updated Candidate model.
-    - user_email: User's email obtained from the Authorization header.
+    - user_email: User's email obtained from the Token Authentication.
 
     Returns:
     - JSON response containing the updated candidate.
@@ -312,15 +350,14 @@ def update_candidate(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 def delete_candidate(
-    request: Request, candidate_id: str, user_email: str = Depends(authorize_user)
+     candidate_id: str, user_email: str = Depends(authorize_user)
 ):
     """
     Endpoint for deleting a candidate by ID.
 
     Args:
-    - request: FastAPI request object.
     - candidate_id: ID of the candidate to be deleted.
-    - user_email: User's email obtained from the Authorization header.
+    - user_email: User's email obtained from the Token Authentication.
 
     Returns:
     - JSON response indicating successful deletion or not found.
@@ -350,7 +387,6 @@ def delete_candidate(
     response_model=List[Candidate],
 )
 def get_all_candidates(
-    request: Request,
     user_email: str = Depends(authorize_user),
     _id: str = Query(None, title="UUID", description="Filter by UUID"),
     first_name: str = Query(
@@ -383,8 +419,7 @@ def get_all_candidates(
     Endpoint for retrieving all candidates with optional filters.
 
     Args:
-    - request: FastAPI request object.
-    - user_email: User's email obtained from the Authorization header.
+    - user_email: User's email obtained from the Token Authentication.
     - _id: Filter by candidate UUID.
     - first_name: Filter by candidate first name.
     - last_name: Filter by candidate last name.
@@ -466,7 +501,6 @@ def get_all_candidates(
 
 @router.get("/generate-report")
 async def generate_report(
-    request: Request,
     page: int = Query(1, gt=0, description="Page number for pagination"),
     page_size: int = Query(10, gt=0, le=100, description="Items per page"),
     user_email: str = Depends(authorize_user),
@@ -475,9 +509,9 @@ async def generate_report(
     Endpoint for generating a report of all candidates in CSV format.
 
     Args:
-    - request: FastAPI request object.
     - page: Page number for pagination (default: 1).
     - page_size: Items per page (default: 10, max: 100).
+    - user_email: User's email obtained from the Token Authentication.
 
     Returns:
     - StreamingResponse: CSV file containing candidate information.
