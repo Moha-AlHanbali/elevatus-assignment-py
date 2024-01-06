@@ -287,6 +287,9 @@ def test_get_all_candidates(test_app):
 
 
 def test_generate_report(test_app):
+    authorization_email = {"Authorization-Email": "useremail@example.com"}
+    invalid_authorization_email = {"Authorization-Email": "somemail@invalid.com"}
+
     # Create test candidates
     test_candidates = [
         {
@@ -321,10 +324,14 @@ def test_generate_report(test_app):
 
     # Create test candidates in the database
     for candidate_data in test_candidates:
-        test_app.post("/candidate", json=candidate_data)
+        test_app.post("/candidate", json=candidate_data, headers=authorization_email)
+
+    response = test_app.get("/generate-report", headers=invalid_authorization_email)
+    assert response.status_code == 401
+
 
     # Make a request to generate the report
-    response = test_app.get("/generate-report")
+    response = test_app.get("/generate-report", headers=authorization_email)
 
     # Assert the response status code
     assert response.status_code == 200
