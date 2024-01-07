@@ -6,6 +6,7 @@ from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from dotenv import dotenv_values
 
+
 # Load configuration from .env file
 CONFIG = dotenv_values(".env")
 
@@ -34,6 +35,7 @@ TEST_CANDIDATES.create_index([("email", 1)], unique=True)
 # Production flag
 PRODUCTION = CONFIG["PRODUCTION"].lower().strip()
 
+# Application level configurations
 SECRET_KEY = CONFIG["SECRET_KEY"]
 ALGORITHM = CONFIG["ALGORITHM"]
 ACCESS_TOKEN_EXPIRE_MINUTES = int(CONFIG["ACCESS_TOKEN_EXPIRE_MINUTES"])

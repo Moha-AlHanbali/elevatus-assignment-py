@@ -12,7 +12,9 @@ from app.internal.settings import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MIN
 from jose import jwt
 
 
+# Set Hash algorithm 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 class User(BaseModel):
     """
@@ -30,6 +32,7 @@ class User(BaseModel):
     - json_extra: Additional JSON schema information, including an example.
     """
     uuid: str = Field(
+        # Auto generated on User creation
         default_factory=lambda: str(uuid4()),
         alias="_id",
         description="User's UUID",
@@ -62,14 +65,17 @@ class Auth(BaseModel):
 
     @staticmethod
     def create_access_token(data: dict):
+        # Set expiration time
         expires = datetime.datetime.now(datetime.UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        # Add it to the JWT Data dict
         to_encode = {"exp": expires, **data}
+        # Encode the JWT
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
 
     def get_password(self, password: str, hashed_password: str):
         """
-        Get hashed user password.
+        Verify that provided password is indeed the user's hashed password.
         """
         return pwd_context.verify(password, hashed_password)
 

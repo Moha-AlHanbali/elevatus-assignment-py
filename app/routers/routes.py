@@ -31,6 +31,7 @@ from app.internal.settings import (
     ALGORITHM,
 )
 
+
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -540,6 +541,7 @@ async def generate_report(
             candidate_info = [str(candidate.get(field, "")) for field in header]
             yield ",".join(candidate_info) + "\n"
 
+    # Return the CSV date based on the query criteria
     response = StreamingResponse(
         generate_csv(),
         media_type="text/csv",

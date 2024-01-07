@@ -13,12 +13,15 @@ from app.routers.routes import router
 app = FastAPI()
 app.include_router(router)
 
+# Prepare some helpers to persist values through the tests
 candidate_test_id = {"value": ""}
 access_token = {"value": ""}
 auth_headers = {"Authorization": ""}
 invalid_auth_headers = {"Authorization": f"Bearer {"SOME_INVALID_VALUE"}"}
 
+
 @pytest.fixture
+# Create Testing client to mock the behavior of the real application, and connect it to a testing DB
 def test_app():
     with TestClient(app) as client:
         if PRODUCTION != "false":
@@ -59,7 +62,7 @@ def test_create_user_unique_email(test_app):
 
 
 def test_create_user_duplicate_email(test_app):
-    # First, create a user with a unique email
+    # First, create a user with a unique email (Arrange & Act)
     response = test_app.post(
         "/user",
         json={
@@ -69,6 +72,7 @@ def test_create_user_duplicate_email(test_app):
             "password": "strongPassword"
         },
     )
+    # Assert
     assert response.status_code == 201
 
     # Attempt to create a user with the same email
@@ -154,13 +158,13 @@ def test_create_candidate(test_app):
         "gender": "Male",
     }
 
-    # Test with invalid authorization email
+    # Test with invalid authorization
     response = test_app.post(
         "/candidate", json=candidate_data, headers=invalid_auth_headers
     )
     assert response.status_code == 401
 
-    # Test with valid authorization email
+    # Test with valid authorization
     response = test_app.post(
         "/candidate", json=candidate_data, headers=auth_headers
     )
@@ -177,13 +181,13 @@ def test_create_candidate(test_app):
 def test_get_candidate(test_app):
     assert candidate_test_id["value"] is not None
 
-    # Test with invalid authorization email
+    # Test with invalid authorization
     response = test_app.get(
         f"/candidate/{candidate_test_id['value']}", headers=invalid_auth_headers
     )
     assert response.status_code == 401
 
-    # Test with valid authorization email
+    # Test with valid authorization
     response = test_app.get(
         f"/candidate/{candidate_test_id['value']}", headers=auth_headers
     )
@@ -209,7 +213,7 @@ def test_update_candidate(test_app):
         "gender": "Male",
     }
 
-    # Test with invalid authorization email
+    # Test with invalid authorization
     response = test_app.put(
         f"/candidate/{candidate_test_id['value']}",
         json=candidate_data,
@@ -217,7 +221,7 @@ def test_update_candidate(test_app):
     )
     assert response.status_code == 401
 
-    # Test with valid authorization email
+    # Test with valid authorization
     response = test_app.put(
         f"/candidate/{candidate_test_id['value']}",
         json=candidate_data,
@@ -234,13 +238,13 @@ def test_update_candidate(test_app):
 
 def test_delete_candidate(test_app):
 
-    # Test with invalid authorization email
+    # Test with invalid authorization
     response = test_app.delete(
         f"/candidate/{candidate_test_id['value']}", headers=invalid_auth_headers
     )
     assert response.status_code == 401
 
-    # Test with valid authorization email
+    # Test with valid authorization
     response = test_app.delete(
         f"/candidate/{candidate_test_id['value']}", headers=auth_headers
     )
@@ -286,13 +290,13 @@ def test_get_all_candidates(test_app):
         headers=auth_headers,
     )
 
-    # Test global search with keywords (invalid authorization email)
+    # Test global search with keywords (invalid authorization)
     response = test_app.get(
         "/all-candidates?keywords=John", headers=invalid_auth_headers
     )
     assert response.status_code == 401
 
-    # Test global search with keywords (valid authorization email)
+    # Test global search with keywords (valid authorization)
     response = test_app.get(
         "/all-candidates?keywords=John", headers=auth_headers
     )
@@ -388,8 +392,6 @@ def test_generate_report(test_app):
     # Assert the content of the CSV file
     expected_headers = "_id,first_name,last_name,email,career_level,job_major,years_of_experience,degree_type,skills,nationality,city,salary,gender\n"
     assert response.text.startswith(expected_headers)
-
-    # You can add additional assertions based on the expected content of the report
 
 
 def test_cleanup(test_app):

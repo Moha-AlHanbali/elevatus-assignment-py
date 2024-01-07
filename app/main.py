@@ -11,8 +11,10 @@ from contextlib import asynccontextmanager
 
 from app.internal.settings import CLIENT, DB_NAME, DB, PRODUCTION
 
-# Just to silence this warning mentioned here: https://github.com/pyca/bcrypt/issues/684
+
+# NOTE: Just to silence this warning mentioned here: https://github.com/pyca/bcrypt/issues/684
 logging.getLogger('passlib').setLevel(logging.ERROR)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,4 +50,5 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Set the application routes
 app.include_router(router)
