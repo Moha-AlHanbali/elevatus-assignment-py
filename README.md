@@ -10,9 +10,10 @@ This project is the implementation of the Elevatus Technical Assignment for a Py
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
-      - [Installing Locally](#installing-locally)
-      - [Installing Containerized Version](#installing-containerized-version)
-    - [Running the Application](#running-the-application)
+      - [Running Locally](#running-locally)
+      - [Running the Containerized Application](#running-the-containerized-application)
+    - [Testing](#testing)
+    - [File Structure](#file-structure)
     - [API Documentation](#api-documentation)
       - [Health Check](#health-check)
     - [Create User](#create-user)
@@ -23,61 +24,63 @@ This project is the implementation of the Elevatus Technical Assignment for a Py
         - [400 Bad Request](#400-bad-request)
         - [500 Internal Server Error](#500-internal-server-error)
       - [User Model](#user-model)
-    - [Create Candidate](#create-candidate)
+    - [Generate Token](#generate-token)
       - [Request](#request-1)
         - [Request Body](#request-body-1)
+        - [401 Unauthorized](#401-unauthorized)
+        - [500 Internal Server Error](#500-internal-server-error-1)
+    - [Create Candidate](#create-candidate)
+        - [Response Body](#response-body)
+      - [Request](#request-2)
+        - [Request Body](#request-body-2)
         - [Dependencies](#dependencies)
       - [Response](#response-1)
       - [Error Responses](#error-responses-1)
         - [400 Bad Request](#400-bad-request-1)
-        - [401 Unauthorized](#401-unauthorized)
-        - [500 Internal Server Error](#500-internal-server-error-1)
+        - [401 Unauthorized](#401-unauthorized-1)
+        - [500 Internal Server Error](#500-internal-server-error-2)
       - [Candidate Model](#candidate-model)
     - [Get Candidate by ID](#get-candidate-by-id)
-      - [Request](#request-2)
+      - [Request](#request-3)
         - [Dependencies](#dependencies-1)
       - [Response](#response-2)
       - [Error Responses](#error-responses-2)
-        - [401 Unauthorized](#401-unauthorized-1)
+        - [401 Unauthorized](#401-unauthorized-2)
         - [404 Not Found](#404-not-found)
       - [Candidate Model](#candidate-model-1)
     - [Update Candidate by ID](#update-candidate-by-id)
-      - [Request](#request-3)
+      - [Request](#request-4)
         - [Dependencies](#dependencies-2)
       - [Response](#response-3)
       - [Error Responses](#error-responses-3)
-        - [401 Unauthorized](#401-unauthorized-2)
+        - [401 Unauthorized](#401-unauthorized-3)
         - [404 Not Found](#404-not-found-1)
       - [Candidate Model](#candidate-model-2)
     - [Delete Candidate by ID](#delete-candidate-by-id)
-      - [Request](#request-4)
+      - [Request](#request-5)
         - [Dependencies](#dependencies-3)
       - [Response](#response-4)
       - [Error Responses](#error-responses-4)
-        - [401 Unauthorized](#401-unauthorized-3)
+        - [401 Unauthorized](#401-unauthorized-4)
         - [404 Not Found](#404-not-found-2)
     - [Get All Candidates](#get-all-candidates)
-      - [Request](#request-5)
+      - [Request](#request-6)
       - [Response](#response-5)
       - [Error Responses](#error-responses-5)
-        - [401 Unauthorized](#401-unauthorized-4)
+        - [401 Unauthorized](#401-unauthorized-5)
         - [400 Bad Request](#400-bad-request-2)
     - [Generate Report](#generate-report)
-      - [Request](#request-6)
+      - [Request](#request-7)
       - [Response](#response-6)
       - [Error Responses](#error-responses-6)
-        - [401 Unauthorized](#401-unauthorized-5)
+        - [401 Unauthorized](#401-unauthorized-6)
         - [400 Bad Request](#400-bad-request-3)
-    - [Testing](#testing)
-    - [Built With](#built-with)
-    - [File Structure](#file-structure)
-    - [Test Coverage](#test-coverage)
 
 ## Keynotes About the Implementation
 
 1. `UUID` fields for both `user` and `candidate` collections are system-handled and auto generated, which are also used as the `ID` query parameter in the APIs.
-2. `Email` field was set as a unique field in both collections as well (each separately).
-3. The required authorization was handled by requesting the user email in `Authorization-Email` header (no authentication implemented).
+2. `Email` field was set as a unique field in both collections as well (each collection separately).
+3. The authorization is handled through a `JWT` obtained through `/token` endpoint, requiring an already existing user credentials.
 
 ## Getting Started
 
@@ -85,57 +88,110 @@ This project is a FastAPI-based web application. Follow the steps below to get s
 
 ### Prerequisites
 
-- Python 3.12
-- MongoDB
-- Docker and Docker Compose Plugin
+[Python 3.12](https://www.python.org/) - Application environment
+
+[FastAPI](https://fastapi.tiangolo.com) - The web framework used
+
+[Pydantic](https://docs.pydantic.dev) - Used for data validation and settings management
+
+[MongoDB](https://www.mongodb.com) - Database used
 
 ### Installation
 
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/yourusername/elevatus-technical-assignment.git
+    git clone https://github.com/Moha-AlHanbali/elevatus-assignment-py
     ```
 
 2. Navigate to the project directory:
 
     ```bash
-    cd elevatus-technical-assignment
+    cd elevatus-assignment-py
     ```
 
-3. Create `.env` file at the root directory level of the application and enter the required environment variables using `.env.sample` as a reference.
+3. Create `.env` file at the root directory of the application and enter the required environment variables using `.env.sample` as a reference.
 
-#### Installing Locally
+#### Running Locally
 
-- Install the required dependencies:
+  Install the required dependencies:
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+  ```bash
+  pip install -r requirements.txt
+  ```
 
-or if you're using Poetry:
+   or if you're using Poetry:
 
-```bash
-poetry install
-```
+  ```bash
+  poetry install
+  ```
 
-#### Installing Containerized Version
+  To run the application, use the following command:
 
-- Run the command
+  ```bash
+  uvicorn app.main:app --reload
+  ```
+
+#### Running the Containerized Application
+
+Run the command
 
 ```bash
 sudo docker compose up
 ```
 
-### Running the Application
+The application will be accessible at `http://localhost:8000` in both cases.
 
-To run the application, use the following command:
+### Testing
 
 ```bash
-uvicorn app.main:app --reload
+pytest
 ```
 
-The application will be accessible at `http://localhost:8000`.
+To check test coverage:
+
+```bash
+coverage run -m pytest  
+coverage report -m
+```
+
+```md
+Name                       Stmts   Miss  Cover   Missing
+--------------------------------------------------------
+app/internal/models.py        49      0   100%
+app/internal/settings.py      22      0   100%
+app/routers/routes.py        173     27    84%
+tests/test_main.py           125      1    99%
+--------------------------------------------------------
+TOTAL                        369     28    92%
+```
+
+### File Structure
+
+```bash
+.
+├── Dockerfile
+├── LICENSE
+├── README.md
+├── __init__.py
+├── app
+│   ├── __init__.py
+│   ├── internal
+│   │   ├── __init__.py
+│   │   ├── database.py
+│   │   └── models.py
+│   ├── main.py
+│   └── routers
+│       ├── __init__.py
+│       └── routes.py
+├── docker-compose.yml
+├── poetry.lock
+├── pyproject.toml
+├── requirements.txt
+└── tests
+    ├── __init__.py
+    └── test_main.py
+```
 
 ### API Documentation
 
@@ -170,13 +226,14 @@ Endpoint for creating a user.
   - Description: User model for the new user.
   - Example:
 
-    ```json
-    {
-      "first_name": "John",
-      "last_name": "Doe",
-      "email": "john.doe@example.com"
-    }
-    ```
+  ```json
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john.doe@example.com",
+    "password": "secretpassword"
+  }
+  ```
 
 #### Response
 
@@ -234,7 +291,69 @@ Endpoint for creating a user.
 }
 ```
 
+### Generate Token
+
+Endpoint for creating an access token.
+
+- **URL:** `/token`
+- **Method:** `POST`
+- **Response Description:** Create a token
+- **Status Code:** 200 OK
+- **Response Model:** [Token](#candidate-model)
+
+#### Request
+
+##### Request Body
+
+- **Body:**
+  - Type: JSON
+  - Description: Token perquisites model for the new JWT.
+  - Example:
+
+  ```json
+  {
+    "email": "john.doe@example.com",
+    "password": "secretPassword"
+  }
+  ```
+
+##### 401 Unauthorized
+
+- **Response Body:**
+  - Type: JSON
+  - Description: Unauthorized.
+  - Example:
+
+    ```json
+    {
+      "detail": "Unauthorized"
+    }
+    ```
+
+##### 500 Internal Server Error
+
+- **Response Body:**
+  - Type: JSON
+  - Description: Internal server error.
+  - Example:
+
+    ```json
+    {
+      "detail": "Internal Server Error"
+    }
+    ```
+
 ### Create Candidate
+
+  ```json
+  {
+    "access_token": "some.jwt.token",
+    "token_type": "bearer"
+  }
+  ```
+
+##### Response Body
+
 
 Endpoint for creating a candidate.
 
@@ -274,11 +393,11 @@ Endpoint for creating a candidate.
 
 - **Dependencies:**
   - Type: Header
-  - Description: User's email obtained from the Authorization header.
+  - Description: Retrieved after validating the access token obtained from [/token](#generate-token) Endpoint using user credentials.
   - Example:
 
     ```plaintext
-    Authorization-Email: useremail@example.com
+    {"Authorization": "Bearer JWT"}
     ```
 
 #### Response
@@ -390,11 +509,11 @@ Endpoint for retrieving a candidate by ID.
 
 - **Dependencies:**
   - Type: Header
-  - Description: User's email obtained from the Authorization header.
+  - Description: Retrieved after validating the access token obtained from [/token](#generate-token) Endpoint using user credentials.
   - Example:
 
     ```plaintext
-    Authorization-Email: useremail@example.com
+    {"Authorization": "Bearer JWT"}
     ```
 
 #### Response
@@ -514,11 +633,11 @@ Endpoint for updating a candidate by ID.
 
 - **Dependencies:**
   - Type: Header
-  - Description: User's email obtained from the Authorization header.
+  - Description: Retrieved after validating the access token obtained from [/token](#generate-token) Endpoint using user credentials.
   - Example:
 
     ```plaintext
-    Authorization-Email: useremail@example.com
+    {"Authorization": "Bearer JWT"}
     ```
 
 #### Response
@@ -616,11 +735,11 @@ Endpoint for deleting a candidate by ID.
 
 - **Dependencies:**
   - Type: Header
-  - Description: User's email obtained from the Authorization header.
+  - Description: Retrieved after validating the access token obtained from [/token](#generate-token) Endpoint using user credentials.
   - Example:
 
     ```plaintext
-    Authorization-Email: useremail@example.com
+    {"Authorization": "Bearer JWT"}
     ```
 
 #### Response
@@ -679,11 +798,11 @@ Endpoint for retrieving all candidates with optional filters.
 - **Parameters:**
   - `user_email` (Header Parameter)
     - Type: String
-    - Description: User's email obtained from the Authorization header.
+    - Description: Retrieved after validating the access token obtained from [/token](#generate-token) Endpoint using user credentials.
     - Example:
 
       ```plaintext
-      Authorization-Email: useremail@example.com
+      {"Authorization": "Bearer JWT"}
       ```
 
   - `UUID` (Query Parameter)
@@ -841,11 +960,11 @@ Endpoint for generating a report of all candidates in CSV format.
 - **Parameters:**
   - `user_email` (Header Parameter)
     - Type: String
-    - Description: User's email obtained from the Authorization header.
+    - Description: Retrieved after validating the access token obtained from [/token](#generate-token) Endpoint using user credentials.
     - Example:
 
       ```plaintext
-      Authorization-Email: useremail@example.com
+      {"Authorization": "Bearer JWT"}
       ```
 
   - `Page` (Query Parameter)
@@ -901,62 +1020,3 @@ Endpoint for generating a report of all candidates in CSV format.
       "detail": "Invalid request parameters"
     }
     ```
-
-### Testing
-
-```bash
-pytest
-```
-
-or to view test coverage:
-
-```bash
-coverage run -m pytest  
-coverage report -m
-```
-
-### Built With
-
-[FastAPI](https://fastapi.tiangolo.com) - The web framework used
-[Pydantic](https://docs.pydantic.dev) - Used for data validation and settings management
-[MongoDB](https://www.mongodb.com) - Database used
-
-### File Structure
-
-```bash
-.
-├── Dockerfile
-├── LICENSE
-├── README.md
-├── __init__.py
-├── app
-│   ├── __init__.py
-│   ├── internal
-│   │   ├── __init__.py
-│   │   ├── database.py
-│   │   └── models.py
-│   ├── main.py
-│   └── routers
-│       ├── __init__.py
-│       └── routes.py
-├── docker-compose.yml
-├── poetry.lock
-├── pyproject.toml
-├── requirements.txt
-└── tests
-    ├── __init__.py
-    └── test_main.py
-```
-
-### Test Coverage
-
-```md
-Name                       Stmts   Miss  Cover   Missing
---------------------------------------------------------
-app/internal/models.py        49      0   100%
-app/internal/settings.py      22      0   100%
-app/routers/routes.py        173     27    84%
-tests/test_main.py           125      1    99%
---------------------------------------------------------
-TOTAL                        369     28    92%
-```
