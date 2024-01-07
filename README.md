@@ -953,10 +953,10 @@ coverage report -m
 ```md
 Name                       Stmts   Miss  Cover   Missing
 --------------------------------------------------------
-app/internal/database.py      19      0   100%
-app/internal/models.py        28      0   100%
-app/routers/routes.py        146     18    88%
-tests/test_main.py           120      1    99%
+app/internal/models.py        49      0   100%
+app/internal/settings.py      22      0   100%
+app/routers/routes.py        173     27    84%
+tests/test_main.py           125      1    99%
 --------------------------------------------------------
-TOTAL                        313     19    94%
+TOTAL                        369     28    92%
 ```

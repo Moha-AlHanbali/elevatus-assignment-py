@@ -2,7 +2,8 @@
 This module contains the DB models.
 """
 
-from datetime import timedelta, datetime
+import datetime
+from datetime import timedelta
 from pydantic import BaseModel, Field, EmailStr
 from passlib.context import CryptContext
 from typing import List, Literal
@@ -24,7 +25,7 @@ class User(BaseModel):
     - email: User's email address.
     - hashed_password: Hashed password.
 
-    Config:
+    ConfigDict:
     - alias: Alias for the "_id" field.
     - json_extra: Additional JSON schema information, including an example.
     """
@@ -38,7 +39,7 @@ class User(BaseModel):
     email: EmailStr = Field(..., description="User's email address")
     hashed_password: str = Field(..., alias="password",description="Hashed password")
 
-    class Config:
+    class ConfigDict:
         alias = {"uuid": "_id"}
         json_extra = {
             "example": {
@@ -61,7 +62,7 @@ class Auth(BaseModel):
 
     @staticmethod
     def create_access_token(data: dict):
-        expires = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires = datetime.datetime.now(datetime.UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode = {"exp": expires, **data}
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
